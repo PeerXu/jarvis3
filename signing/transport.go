@@ -1,9 +1,6 @@
 package signing
 
 import (
-	"bytes"
-	"encoding/json"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/go-kit/kit/endpoint"
@@ -12,20 +9,23 @@ import (
 	"golang.org/x/net/context"
 
 	jkth "github.com/PeerXu/jarvis3/kit/transport/http"
+	. "github.com/PeerXu/jarvis3/signing/encode_decode"
+	. "github.com/PeerXu/jarvis3/signing/endpoint"
+	. "github.com/PeerXu/jarvis3/signing/service"
 )
 
 func MakeHandler(ctx context.Context, s Service) http.Handler {
 	r := mux.NewRouter()
 
 	opts := []kithttp.ServerOption{
-		kithttp.ServerErrorEncoder(encodeError),
+		kithttp.ServerErrorEncoder(EncodeError),
 	}
 
 	var signCreateUserHandler *kithttp.Server
 	{
-		signCreateUserEndpoint := makeSignCreateUserEndpoint(s)
+		signCreateUserEndpoint := MakeSignCreateUserEndpoint(s)
 		signCreateUserEndpoint = endpoint.Chain(
-			ValidateAccessTokenMiddeware(s),
+			ValidateTokenMiddeware(s),
 		)(signCreateUserEndpoint)
 		signCreateUserOptions := append(
 			opts,
@@ -34,17 +34,17 @@ func MakeHandler(ctx context.Context, s Service) http.Handler {
 		signCreateUserHandler = kithttp.NewServer(
 			ctx,
 			signCreateUserEndpoint,
-			decodeSignCreateUserRequest,
-			makeResponseEncoder(http.StatusOK),
+			DecodeSignCreateUserRequest,
+			MakeResponseEncoder(http.StatusOK),
 			signCreateUserOptions...,
 		)
 	}
 
 	var signDeleteUserHandler *kithttp.Server
 	{
-		signDeleteUserEndpoint := makeSignDeleteUserEndpoint(s)
+		signDeleteUserEndpoint := MakeSignDeleteUserByIDEndpoint(s)
 		signDeleteUserEndpoint = endpoint.Chain(
-			ValidateAccessTokenMiddeware(s),
+			ValidateTokenMiddeware(s),
 		)(signDeleteUserEndpoint)
 		signDeleteUserOptions := append(
 			opts,
@@ -53,17 +53,17 @@ func MakeHandler(ctx context.Context, s Service) http.Handler {
 		signDeleteUserHandler = kithttp.NewServer(
 			ctx,
 			signDeleteUserEndpoint,
-			decodeSignDeleteUserRequest,
-			makeResponseEncoder(http.StatusNoContent),
+			DecodeSignDeleteUserByIDRequest,
+			MakeResponseEncoder(http.StatusNoContent),
 			signDeleteUserOptions...,
 		)
 	}
 
 	var signGetUserHandler *kithttp.Server
 	{
-		signGetUserEndpoint := makeSignGetUserEndpoint(s)
+		signGetUserEndpoint := MakeSignGetUserByIDEndpoint(s)
 		signGetUserEndpoint = endpoint.Chain(
-			ValidateAccessTokenMiddeware(s),
+			ValidateTokenMiddeware(s),
 		)(signGetUserEndpoint)
 		signGetUserOptions := append(
 			opts,
@@ -72,30 +72,30 @@ func MakeHandler(ctx context.Context, s Service) http.Handler {
 		signGetUserHandler = kithttp.NewServer(
 			ctx,
 			signGetUserEndpoint,
-			decodeSignGetUserRequest,
-			makeResponseEncoder(http.StatusOK),
+			DecodeSignGetUserRequest,
+			MakeResponseEncoder(http.StatusOK),
 			signGetUserOptions...,
 		)
 	}
 
 	var signLoginHandler *kithttp.Server
 	{
-		signLoginEndpoint := makeSignLoginEndpoint(s)
+		signLoginEndpoint := MakeSignLoginEndpoint(s)
 		signLoginOptions := opts
 		signLoginHandler = kithttp.NewServer(
 			ctx,
 			signLoginEndpoint,
-			decodeSignLoginRequest,
-			makeResponseEncoder(http.StatusOK),
+			DecodeSignLoginRequest,
+			MakeResponseEncoder(http.StatusOK),
 			signLoginOptions...,
 		)
 	}
 
 	var signLogoutHandler *kithttp.Server
 	{
-		signLogoutEndpoint := makeSignLogoutEndpoint(s)
+		signLogoutEndpoint := MakeSignLogoutEndpoint(s)
 		signLogoutEndpoint = endpoint.Chain(
-			ValidateAccessTokenMiddeware(s),
+			ValidateTokenMiddeware(s),
 		)(signLogoutEndpoint)
 		signLogoutOptions := append(
 			opts,
@@ -104,17 +104,17 @@ func MakeHandler(ctx context.Context, s Service) http.Handler {
 		signLogoutHandler = kithttp.NewServer(
 			ctx,
 			signLogoutEndpoint,
-			decodeSignLogoutRequest,
-			makeResponseEncoder(http.StatusNoContent),
+			DecodeSignLogoutRequest,
+			MakeResponseEncoder(http.StatusNoContent),
 			signLogoutOptions...,
 		)
 	}
 
 	var signCreateAgentTokenHandler *kithttp.Server
 	{
-		signCreateAgentTokenEndpoint := makeSignCreateAgentTokenEndpoint(s)
+		signCreateAgentTokenEndpoint := MakeSignCreateAgentTokenEndpoint(s)
 		signCreateAgentTokenEndpoint = endpoint.Chain(
-			ValidateAccessTokenMiddeware(s),
+			ValidateTokenMiddeware(s),
 		)(signCreateAgentTokenEndpoint)
 		signCreateAgentTokenOptions := append(
 			opts,
@@ -123,17 +123,17 @@ func MakeHandler(ctx context.Context, s Service) http.Handler {
 		signCreateAgentTokenHandler = kithttp.NewServer(
 			ctx,
 			signCreateAgentTokenEndpoint,
-			decodeSignCreateAgentTokenRequest,
-			makeResponseEncoder(http.StatusOK),
+			DecodeSignCreateAgentTokenRequest,
+			MakeResponseEncoder(http.StatusOK),
 			signCreateAgentTokenOptions...,
 		)
 	}
 
 	var signDeleteAgentTokenHandler *kithttp.Server
 	{
-		signDeleteAgentTokenEndpoint := makeSignDeleteAgentTokenEndpoint(s)
+		signDeleteAgentTokenEndpoint := MakeSignDeleteAgentTokenEndpoint(s)
 		signDeleteAgentTokenEndpoint = endpoint.Chain(
-			ValidateAccessTokenMiddeware(s),
+			ValidateTokenMiddeware(s),
 		)(signDeleteAgentTokenEndpoint)
 		signDeleteAgentTokenOptions := append(
 			opts,
@@ -142,277 +142,36 @@ func MakeHandler(ctx context.Context, s Service) http.Handler {
 		signDeleteAgentTokenHandler = kithttp.NewServer(
 			ctx,
 			signDeleteAgentTokenEndpoint,
-			decodeSignDeleteAgentTokenRequest,
-			makeResponseEncoder(http.StatusNoContent),
+			DecodeSignDeleteAgentTokenRequest,
+			MakeResponseEncoder(http.StatusNoContent),
 			signDeleteAgentTokenOptions...,
 		)
 	}
 
-	var signValidateAccessTokenHandler *kithttp.Server
+	var signValidateTokenHandler *kithttp.Server
 	{
-		signValidateAccessTokenEndpoint := makeSignValidateAccessTokenEndpoint(s)
-		signValidateAccessTokenOptions := append(
+		signValidateTokenEndpoint := MakeSignValidateTokenEndpoint(s)
+		signValidateTokenOptions := append(
 			opts,
 			kithttp.ServerBefore(jkth.ExtractAuthorizationFromRequestHeader),
 		)
-		signValidateAccessTokenHandler = kithttp.NewServer(
+		signValidateTokenHandler = kithttp.NewServer(
 			ctx,
-			signValidateAccessTokenEndpoint,
-			decodeSignValidateAccessTokenRequest,
-			makeResponseEncoder(http.StatusOK),
-			signValidateAccessTokenOptions...,
+			signValidateTokenEndpoint,
+			DecodeSignValidateTokenRequest,
+			MakeResponseEncoder(http.StatusOK),
+			signValidateTokenOptions...,
 		)
 	}
 
 	r.Handle("/signing/v1/users", signCreateUserHandler).Methods("POST")
-	r.Handle("/signing/v1/users/self", signValidateAccessTokenHandler).Methods("GET")
-	r.Handle("/signing/v1/users/{username}", signDeleteUserHandler).Methods("DELETE")
-	r.Handle("/signing/v1/users/{username}", signGetUserHandler).Methods("GET")
-	r.Handle("/signing/v1/users/{username}/accessTokens", signLoginHandler).Methods("POST")
-	r.Handle("/signing/v1/users/{username}/accessTokens", signLogoutHandler).Methods("DELETE")
-	r.Handle("/signing/v1/users/{username}/agentTokens", signCreateAgentTokenHandler).Methods("POST")
-	r.Handle("/signing/v1/users/{username}/agentTokens/{name}", signDeleteAgentTokenHandler).Methods("DELETE")
+	r.Handle("/signing/v1/users/self", signValidateTokenHandler).Methods("GET")
+	r.Handle("/signing/v1/users/self/access_tokens", signLoginHandler).Methods("POST")
+	r.Handle("/signing/v1/users/{user_id}", signDeleteUserHandler).Methods("DELETE")
+	r.Handle("/signing/v1/users/{user_id}", signGetUserHandler).Methods("GET")
+	r.Handle("/signing/v1/users/{user_id}/access_tokens", signLogoutHandler).Methods("DELETE")
+	r.Handle("/signing/v1/users/{user_id}/agent_tokens", signCreateAgentTokenHandler).Methods("POST")
+	r.Handle("/signing/v1/users/{user_id}/agent_tokens/{name}", signDeleteAgentTokenHandler).Methods("DELETE")
 
 	return r
-}
-
-func encodeSignCreateUserRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	// r.Path("/signing/v1/users").Methods("POST")
-	r.Method, r.URL.Path = "POST", "/signing/v1/users"
-	return encodeRequest(ctx, r, request)
-}
-
-func encodeSignDeleteUserRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	// r.Path("/signing/v1/users/{username}").Methods("DELETE")
-	r.Method, r.URL.Path = "DELETE", "/signing/v1/users/"+ctx.Value("Username").(string)
-	return nil
-}
-
-func encodeSignGetUserRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	// r.Path("/signing/v1/users/{username}").Methods("GET")
-	r.Method, r.URL.Path = "GET", "/signing/v1/users/"+ctx.Value("Username").(string)
-	return nil
-}
-
-func encodeSignLoginRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	// r.Path("/signing/v1/users/{username}/accessTokens").Methods("POST")
-	req := request.(signLoginRequest)
-	r.Method, r.URL.Path = "POST", "/signing/v1/users/"+req.Username+"/accessTokens"
-	return encodeRequest(ctx, r, request)
-}
-
-func encodeSignLogoutRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	// r.Path("/signing/v1/users/{username}/accessTokens").Methods("DELETE")
-	r.Method, r.URL.Path = "DELETE", "/signing/v1/users/"+ctx.Value("Username").(string)+"/accessTokens"
-	return nil
-}
-
-func encodeSignCreateAgentTokenRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	// r.Path("/signing/v1/users/{username}/agentTokens").Methods("POST")
-	r.Method, r.URL.Path = "POST", "/signing/v1/users/"+ctx.Value("Username").(string)+"/agentTokens"
-	return encodeRequest(ctx, r, request)
-}
-
-func encodeSignDeleteAgentTokenRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	// r.Path("/signing/v1/users/{username}/agentTokens/{agentTokenName}").Methods("DELETE")
-	req := request.(signDeleteAgentTokenRequest)
-	r.Method, r.URL.Path = "DELETE", "/signing/v1/users/"+ctx.Value("Username").(string)+"/agentTokens/"+req.Name
-	return nil
-}
-
-func encodeSignValidateAccessTokenRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	// r.Path("/signing/v1/users/self").Methods("GET")
-	r.Method, r.URL.Path = "GET", "/signing/v1/users/self"
-	return nil
-}
-
-func decodeSignCreateUserResponse(ctx context.Context, res *http.Response) (interface{}, error) {
-	var response signCreateUserResponse
-	err := json.NewDecoder(res.Body).Decode(&response)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func decodeSignDeleteUserResponse(ctx context.Context, res *http.Response) (interface{}, error) {
-	return signDeleteUserResponse{}, nil
-}
-
-func decodeSignGetUserResponse(ctx context.Context, res *http.Response) (interface{}, error) {
-	var response signGetUserResponse
-	err := json.NewDecoder(res.Body).Decode(&response)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func decodeSignLoginResponse(ctx context.Context, res *http.Response) (interface{}, error) {
-	var response signLoginResponse
-	err := json.NewDecoder(res.Body).Decode(&response)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func decodeSignLogoutResponse(ctx context.Context, res *http.Response) (interface{}, error) {
-	return signLogoutResponse{}, nil
-}
-
-func decodeSignCreateAgentTokenResponse(ctx context.Context, res *http.Response) (interface{}, error) {
-	var response signCreateAgentTokenResponse
-	err := json.NewDecoder(res.Body).Decode(&response)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func decodeSignDeleteAgentTokenResponse(ctx context.Context, res *http.Response) (interface{}, error) {
-	return signDeleteAgentTokenResponse{}, nil
-}
-
-func decodeSignValidateAccessTokenResponse(ctx context.Context, res *http.Response) (interface{}, error) {
-	var response signValidateAccessTokenResponse
-	err := json.NewDecoder(res.Body).Decode(&response)
-	if err != nil {
-		return nil, err
-	}
-	return response, nil
-}
-
-func decodeSignCreateUserRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	var body struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		return nil, err
-	}
-
-	return signCreateUserRequest{
-		Username: body.Username,
-		Password: body.Password,
-		Email:    body.Email,
-	}, nil
-}
-
-func decodeSignDeleteUserRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	vars := mux.Vars(r)
-	username := vars["username"]
-	return signDeleteUserRequest{Username: username}, nil
-}
-
-func decodeSignGetUserRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	vars := mux.Vars(r)
-	username := vars["username"]
-	return signGetUserRequest{Username: username}, nil
-}
-
-func decodeSignLoginRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	var body struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		return nil, err
-	}
-
-	vars := mux.Vars(r)
-	username := vars["username"]
-	body.Username = username
-
-	return signLoginRequest{
-		Username: body.Username,
-		Password: body.Password,
-	}, nil
-}
-
-func decodeSignLogoutRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	vars := mux.Vars(r)
-	username := vars["username"]
-	return signLogoutRequest{Username: username}, nil
-}
-
-func decodeSignCreateAgentTokenRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	var body struct {
-		Name string `json:"name"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		return nil, err
-	}
-
-	return signCreateAgentTokenRequest{Name: body.Name}, nil
-}
-
-func decodeSignDeleteAgentTokenRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	vars := mux.Vars(r)
-	name := vars["name"]
-	return signDeleteAgentTokenRequest{Name: name}, nil
-}
-
-func decodeSignValidateAccessTokenRequest(ctx context.Context, r *http.Request) (interface{}, error) {
-	return signValidateAccessTokenRequest{}, nil
-}
-
-func encodeRequest(ctx context.Context, r *http.Request, request interface{}) error {
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(request)
-	if err != nil {
-		return err
-	}
-	r.Body = ioutil.NopCloser(&buf)
-	return nil
-}
-
-func makeResponseEncoder(code int) func(context.Context, http.ResponseWriter, interface{}) error {
-	return func(ctx context.Context, w http.ResponseWriter, response interface{}) error {
-		if err, ok := response.(error); ok {
-			encodeError(ctx, err, w)
-			return nil
-		}
-		return encodeResponse(ctx, w, code, response)
-	}
-}
-
-func encodeResponse(ctx context.Context, w http.ResponseWriter, code int, response interface{}) error {
-	if code == 0 {
-		code = http.StatusInternalServerError
-	}
-	w.WriteHeader(code)
-
-	if code != http.StatusNoContent {
-		return json.NewEncoder(w).Encode(response)
-	}
-
-	return nil
-}
-
-func encodeError(ctx context.Context, err error, w http.ResponseWriter) {
-	serr, ok := err.(*signError)
-	if !ok {
-		serr = newSignError(errorServerError, "unknown error", err)
-	}
-
-	var code int
-	switch serr.Type {
-	case errorInvalidRequest:
-		code = http.StatusBadRequest
-	case errorAccessDenied:
-		code = http.StatusUnauthorized
-	case errorNotFound:
-		code = http.StatusNotFound
-	case errorServerError:
-	default:
-		code = http.StatusInternalServerError
-	}
-	w.WriteHeader(code)
-
-	json.NewEncoder(w).Encode(serr)
 }

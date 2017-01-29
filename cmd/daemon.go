@@ -1,16 +1,19 @@
-// Copyright © 2016 Peer Xu <pppeerxu@gmail.com>
+// Copyright © 2017 Peer Xu <pppeerxu@gmail.com>
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// This file is part of test.
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// test is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// test is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with test. If not, see <http://www.gnu.org/licenses/>.
 
 package cmd
 
@@ -23,11 +26,14 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/net/context"
 
 	"github.com/PeerXu/jarvis3/computing"
+	computing_service "github.com/PeerXu/jarvis3/computing/service"
 	"github.com/PeerXu/jarvis3/repository"
 	"github.com/PeerXu/jarvis3/signing"
+	signing_service "github.com/PeerXu/jarvis3/signing/service"
 )
 
 // daemonCmd represents the daemon command
@@ -50,13 +56,13 @@ var daemonCmd = &cobra.Command{
 			projects = repository.NewProjectRepository()
 		)
 
-		var signingService signing.Service
+		var signingService signing_service.Service
 		{
 			signingService = signing.NewService(logger, users)
 			signingService = signing.NewLoggingService(log.NewContext(logger).With("component", "signing"), signingService)
 		}
 
-		var computingService computing.Service
+		var computingService computing_service.Service
 		{
 			computingService = computing.NewService(logger, projects)
 			computingService = computing.NewLoggingService(log.NewContext(logger).With("component", "computing"), computingService)
@@ -64,7 +70,7 @@ var daemonCmd = &cobra.Command{
 
 		mux := http.NewServeMux()
 
-		signCli, err := SimpleNewSigningClientWithEnvironment(logger)
+		signCli, err := NewSigningClientForService(logger)
 		if err != nil {
 			cmd.Printf("create singing client error: %v", err)
 			return
@@ -73,12 +79,15 @@ var daemonCmd = &cobra.Command{
 		mux.Handle("/signing/v1/", signing.MakeHandler(ctx, signingService))
 		mux.Handle("/computing/v1/", computing.MakeHandler(ctx, computingService, signCli))
 
+		mux.Handle("/agent/v1/", http.StripPrefix("/agent/v1/", http.FileServer(http.Dir("dist/agent"))))
+		mux.Handle("/example/v1/", http.StripPrefix("/example/v1/", http.FileServer(http.Dir("example/web"))))
+
 		http.Handle("/", accessControl(mux))
 
 		errs := make(chan error, 2)
 
 		go func() {
-			errs <- http.ListenAndServe(":27182", nil)
+			errs <- http.ListenAndServe(viper.GetString("development.server.host"), nil)
 		}()
 		go func() {
 			c := make(chan os.Signal)
@@ -92,17 +101,6 @@ var daemonCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(daemonCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// daemonCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// daemonCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
 }
 
 func accessControl(h http.Handler) http.Handler {

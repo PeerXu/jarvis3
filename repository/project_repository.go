@@ -4,19 +4,27 @@ import (
 	"sync"
 
 	"github.com/PeerXu/jarvis3/project"
+	"github.com/PeerXu/jarvis3/user"
 )
 
 type projectRepository struct {
-	mtx       sync.RWMutex
-	projects  map[string]map[string]*project.Project
-	executors map[string]map[string]*project.Executor
+	mtx          sync.RWMutex
+	schMtx       sync.Mutex
+	executors    map[project.ExecutorID]*project.Executor
+	projects     map[project.ProjectID]*project.Project
+	tasks        map[project.TaskID]*project.Task
+	readyTasks   map[project.TaskID]*project.Task
+	runningTasks map[project.TaskID]*project.Task
 }
 
 func NewProjectRepository() *projectRepository {
 	return &projectRepository{
-		mtx:       sync.RWMutex{},
-		projects:  map[string]map[string]*project.Project{},
-		executors: map[string]map[string]*project.Executor{},
+		mtx:          sync.RWMutex{},
+		executors:    map[project.ExecutorID]*project.Executor{},
+		projects:     map[project.ProjectID]*project.Project{},
+		tasks:        map[project.TaskID]*project.Task{},
+		readyTasks:   map[project.TaskID]*project.Task{},
+		runningTasks: map[project.TaskID]*project.Task{},
 	}
 }
 
@@ -24,143 +32,101 @@ func (r *projectRepository) CreateExecutor(e *project.Executor) (*project.Execut
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
-	var userExecutors map[string]*project.Executor
-	var ok bool
+	r.executors[e.ID] = e
 
-	if userExecutors, ok = r.executors[e.Owner]; !ok {
-		userExecutors = map[string]*project.Executor{}
-		r.executors[e.Owner] = userExecutors
-	}
-
-	userExecutors[e.Name] = e
 	return e, nil
 }
 
-func (r *projectRepository) DeleteExecutor(owner string, name string) (err error) {
+func (r *projectRepository) DeleteExecutorByID(id project.ExecutorID) error {
+	_, err := r.GetExecutorByID(id)
+	if err != nil {
+		return err
+	}
+
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
-	var userExecutors map[string]*project.Executor
-	var ok bool
+	delete(r.executors, id)
 
-	if userExecutors, ok = r.executors[owner]; !ok {
-		err = project.ErrOwnerNotFound
-	}
-
-	if _, ok = userExecutors[name]; !ok {
-		err = project.ErrExecutorNotFound
-
-	}
-
-	delete(userExecutors, name)
-
-	return
+	return nil
 }
 
-func (r *projectRepository) GetExecutor(owner string, name string) (*project.Executor, error) {
+func (r *projectRepository) GetExecutorByID(id project.ExecutorID) (*project.Executor, error) {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	if userExecutors, ok := r.executors[owner]; ok {
-		if executor, ok := userExecutors[name]; ok {
-			return executor, nil
-		}
-		return nil, project.ErrExecutorNotFound
+	if e, ok := r.executors[id]; ok {
+		return e, nil
 	}
 
-	return nil, project.ErrOwnerNotFound
+	return nil, project.ErrExecutorNotFound
 }
 
-func (r *projectRepository) ListExecutors(owner string) ([]*project.Executor, error) {
+func (r *projectRepository) ListExecutors(userID user.UserID) ([]*project.Executor, error) {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	if userExecutors, ok := r.executors[owner]; ok {
-		var executors []*project.Executor
-		for _, e := range userExecutors {
-			executors = append(executors, e)
+	executors := []*project.Executor{}
+
+	for _, exec := range r.executors {
+		if exec.OwnerID == userID {
+			executors = append(executors, exec)
 		}
-		return executors, nil
 	}
 
-	return nil, project.ErrOwnerNotFound
+	return executors, nil
 }
 
 func (r *projectRepository) CreateProject(p *project.Project) (*project.Project, error) {
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
-	var userProjects map[string]*project.Project
-	var ok bool
-
-	if userProjects, ok = r.projects[p.Owner]; !ok {
-		userProjects = map[string]*project.Project{}
-		r.projects[p.Owner] = userProjects
-	}
-
-	userProjects[p.Name] = p
+	r.projects[p.ID] = p
 	return p, nil
 }
 
-func (r *projectRepository) DeleteProject(owner string, name string) (err error) {
+func (r *projectRepository) DeleteProjectByID(id project.ProjectID) error {
+	_, err := r.GetProjectByID(id)
+	if err != nil {
+		return err
+	}
+
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
-	var userProjects map[string]*project.Project
-	var ok bool
+	delete(r.projects, id)
 
-	if userProjects, ok = r.projects[owner]; !ok {
-		return project.ErrOwnerNotFound
-	}
-
-	if _, ok = userProjects[name]; !ok {
-		return project.ErrProjectNotFound
-	}
-
-	delete(userProjects, name)
 	return nil
 }
 
-func (r *projectRepository) GetProject(owner string, name string) (*project.Project, error) {
+func (r *projectRepository) GetProjectByID(id project.ProjectID) (*project.Project, error) {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	var userProjects map[string]*project.Project
-	var proj *project.Project
-	var ok bool
-
-	if userProjects, ok = r.projects[owner]; !ok {
-		return nil, project.ErrOwnerNotFound
+	if proj, ok := r.projects[id]; ok {
+		return proj, nil
 	}
 
-	if proj, ok = userProjects[name]; !ok {
-		return nil, project.ErrProjectNotFound
-	}
-
-	return proj, nil
+	return nil, project.ErrProjectNotFound
 }
 
-func (r *projectRepository) ListProjects(owner string) ([]*project.Project, error) {
+func (r *projectRepository) ListProjects(userID user.UserID) ([]*project.Project, error) {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	var userProjects map[string]*project.Project
-	var projects []*project.Project
-	var ok bool
+	projects := []*project.Project{}
 
-	if userProjects, ok = r.projects[owner]; !ok {
-		return nil, project.ErrOwnerNotFound
-	}
-
-	for _, p := range userProjects {
-		projects = append(projects, p)
+	for _, proj := range r.projects {
+		if proj.OwnerID == userID {
+			projects = append(projects, proj)
+		}
 	}
 
 	return projects, nil
 }
 
-func (r *projectRepository) CreateJob(owner string, proj string, job *project.Job) (*project.Job, error) {
-	p, err := r.GetProject(owner, proj)
+func (r *projectRepository) CreateTask(task *project.Task) (*project.Task, error) {
+	p, err := r.GetProjectByID(task.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -168,12 +134,23 @@ func (r *projectRepository) CreateJob(owner string, proj string, job *project.Jo
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
-	p.Jobs = append(p.Jobs, job)
-	return job, nil
+	p.Tasks = append(p.Tasks, task)
+	r.tasks[task.ID] = task
+	return task, nil
 }
 
-func (r *projectRepository) GetJob(owner string, proj string, name string) (*project.Job, error) {
-	p, err := r.GetProject(owner, proj)
+func (r *projectRepository) GetTaskByID(id project.TaskID) (*project.Task, error) {
+	r.mtx.RLock()
+	defer r.mtx.RUnlock()
+
+	if j, ok := r.tasks[id]; ok {
+		return j, nil
+	}
+	return nil, project.ErrTaskNotFound
+}
+
+func (r *projectRepository) ListTasksByProjectID(projID project.ProjectID) ([]*project.Task, error) {
+	p, err := r.GetProjectByID(projID)
 	if err != nil {
 		return nil, err
 	}
@@ -181,45 +158,89 @@ func (r *projectRepository) GetJob(owner string, proj string, name string) (*pro
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	var job *project.Job
-	for _, j := range p.Jobs {
-		if j.Name == name {
-			job = j
-			break
+	return p.Tasks, nil
+}
+
+func (r *projectRepository) UpdateTaskByID(id project.TaskID, task *project.Task) (*project.Task, error) {
+	t, err := r.GetTaskByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	r.mtx.Lock()
+	defer r.mtx.Unlock()
+
+	if task.Status == project.TaskStatus_Ready {
+		delete(r.runningTasks, t.ID)
+		r.readyTasks[t.ID] = t
+	}
+
+	if task.Status == project.TaskStatus_Running {
+		delete(r.readyTasks, t.ID)
+		r.runningTasks[t.ID] = t
+	}
+
+	if task.Status == project.TaskStatus_Stop || task.Status == project.TaskStatus_Error {
+		if t.Status != project.TaskStatus_Running {
+			return nil, project.ErrTaskNotRunning
+		}
+		delete(r.runningTasks, t.ID)
+	}
+
+	if task.Status != project.TaskStatus_Unknown {
+		t.Status = task.Status
+	}
+
+	return t, nil
+}
+
+func (r *projectRepository) DeleteTaskByID(id project.TaskID) error {
+	task, err := r.GetTaskByID(id)
+	if err != nil {
+		return err
+	}
+
+	r.mtx.Lock()
+	defer r.mtx.Unlock()
+
+	p, err := r.GetProjectByID(task.ProjectID)
+	if err != nil {
+		return err
+	}
+
+	var ts []*project.Task
+	for _, t := range p.Tasks {
+		if t.ID != task.ID {
+			ts = append(ts, t)
 		}
 	}
+	p.Tasks = ts
 
-	if job == nil {
-		return nil, project.ErrJobNotFound
-	}
+	delete(r.tasks, id)
 
-	return job, nil
+	return nil
 }
 
-func (r *projectRepository) ListJobs(owner string, proj string) ([]*project.Job, error) {
-	p, err := r.GetProject(owner, proj)
+func (r *projectRepository) PopReadyTask() (*project.Task, error) {
+	r.schMtx.Lock()
+	defer r.schMtx.Unlock()
+
+	if len(r.readyTasks) == 0 {
+		return nil, project.ErrNotReadyTask
+	}
+
+	var task *project.Task
+	var err error
+	// FIXME(Peer): nofair scheduler
+	for id := range r.readyTasks {
+		task = r.readyTasks[id]
+		task.Status = project.TaskStatus_Running
+		task, err = r.UpdateTaskByID(task.ID, task)
+		break
+	}
+
 	if err != nil {
 		return nil, err
 	}
-
-	r.mtx.RLock()
-	defer r.mtx.RUnlock()
-
-	return p.Jobs, nil
-}
-
-func (r *projectRepository) UpdateJob(owner string, name string, proj string, job *project.Job) (*project.Job, error) {
-	j, err := r.GetJob(owner, proj, name)
-	if err != nil {
-		return nil, err
-	}
-
-	r.mtx.Lock()
-	defer r.mtx.Unlock()
-
-	if job.Status != project.JobStatus_Unknown {
-		j.Status = job.Status
-	}
-
-	return j, nil
+	return task, nil
 }

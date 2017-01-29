@@ -7,5 +7,10 @@ var (
 	ErrOwnerNotFound    = errors.New("owner not found")
 	ErrExecutorNotFound = errors.New("executor not found")
 	ErrProjectNotFound  = errors.New("project not found")
-	ErrJobNotFound      = errors.New("job not found")
+	ErrTaskNotFound     = errors.New("task not found")
+
+	ErrNotReadyTask   = errors.New("ready task not found")
+	ErrNotRunningTask = errors.New("running task not found")
+
+	ErrTaskNotRunning = errors.New("can't change to stop or error for not running task")
 )

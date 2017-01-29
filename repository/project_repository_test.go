@@ -3,61 +3,89 @@ package repository
 import (
 	"testing"
 
-	c "github.com/smartystreets/goconvey/convey"
+	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/PeerXu/jarvis3/project"
 )
 
 func TestProjectRepository(t *testing.T) {
-	c.Convey("Testing Project Repository", t, func() {
-		r := NewProjectRepository()
+	Convey("Testing Project Repository", t, func() {
+		ur := NewUserRepository()
+		u, err := ur.LookupUserByUsername("admin")
+		So(err, ShouldBeNil)
 
-		c.Convey("should create an executor", func() {
-			e := project.NewExecutor("test", "example.com/peerxu/jarvis3", "admin", nil)
-			_, err := r.CreateExecutor(e)
-			c.So(err, c.ShouldBeNil)
-			_, err = r.GetExecutor("admin", "test")
-			c.So(err, c.ShouldBeNil)
-			executors, err := r.ListExecutors("admin")
-			c.So(err, c.ShouldBeNil)
-			c.So(len(executors), c.ShouldEqual, 1)
+		userID := u.ID
 
-			c.Convey("should delete an existed executor", func() {
-				err := r.DeleteExecutor("admin", "test")
-				c.So(err, c.ShouldBeNil)
+		pr := NewProjectRepository()
+
+		Convey("should create an executor", func() {
+			e := project.NewExecutor(userID, "test", "example.com/peerxu/jarvis3", nil)
+			exec, err := pr.CreateExecutor(e)
+			So(err, ShouldBeNil)
+
+			execID := exec.ID
+			_, err = pr.GetExecutorByID(execID)
+			So(err, ShouldBeNil)
+
+			executors, err := pr.ListExecutors(userID)
+			So(err, ShouldBeNil)
+			So(len(executors), ShouldEqual, 1)
+
+			Convey("should delete an existed executor", func() {
+				err := pr.DeleteExecutorByID(execID)
+				So(err, ShouldBeNil)
 			})
 
-			c.Convey("should create a project", func() {
-				p := project.NewProject("proj0", "admin")
-				_, err := r.CreateProject(p)
-				c.So(err, c.ShouldBeNil)
-				_, err = r.GetProject("admin", "proj0")
-				c.So(err, c.ShouldBeNil)
-				projs, err := r.ListProjects("admin")
-				c.So(err, c.ShouldBeNil)
-				c.So(len(projs), c.ShouldEqual, 1)
+			Convey("should create a project", func() {
+				p := project.NewProject(userID, "proj0")
+				proj, err := pr.CreateProject(p)
+				So(err, ShouldBeNil)
 
-				c.Convey("should delete an existed project", func() {
-					err := r.DeleteProject("admin", "proj0")
-					c.So(err, c.ShouldBeNil)
+				projID := proj.ID
 
-					_, err = r.GetProject("admin", "proj0")
-					c.So(err, c.ShouldEqual, project.ErrProjectNotFound)
+				_, err = pr.GetProjectByID(projID)
+				So(err, ShouldBeNil)
+
+				projs, err := pr.ListProjects(userID)
+				So(err, ShouldBeNil)
+				So(len(projs), ShouldEqual, 1)
+
+				Convey("should delete an existed project", func() {
+					err := pr.DeleteProjectByID(projID)
+					So(err, ShouldBeNil)
+
+					_, err = pr.GetProjectByID(projID)
+					So(err, ShouldEqual, project.ErrProjectNotFound)
 				})
 
-				c.Convey("should create a job", func() {
-					j := project.NewJob("j1", e, nil)
-					_, err := r.CreateJob("admin", "proj0", j)
-					c.So(err, c.ShouldBeNil)
+				Convey("should create a task", func() {
+					t := project.NewTask(projID, execID, "t1", nil)
+					task, err := pr.CreateTask(t)
+					So(err, ShouldBeNil)
 
-					jobs, err := r.ListJobs("admin", "proj0")
-					c.So(err, c.ShouldBeNil)
-					c.So(len(jobs), c.ShouldEqual, 1)
+					taskID := task.ID
 
-					c.Convey("should update an existed job", func() {
-						j := &project.Job{Status: project.JobStatus_Stop}
-						_, err := r.UpdateJob("admin", "j1", "proj0", j)
-						c.So(err, c.ShouldBeNil)
+					tasks, err := pr.ListTasksByProjectID(projID)
+					So(err, ShouldBeNil)
+					So(len(tasks), ShouldEqual, 1)
+
+					Convey("should get an existed task", func() {
+						_, err = pr.GetTaskByID(taskID)
+						So(err, ShouldBeNil)
+					})
+
+					SkipConvey("should update an existed task", func() {
+						t := &project.Task{Status: project.TaskStatus_Stop}
+						_, err := pr.UpdateTaskByID(taskID, t)
+						So(err, ShouldBeNil)
+					})
+
+					SkipConvey("should delete an existed task", func() {
+						err := pr.DeleteTaskByID(taskID)
+						So(err, ShouldBeNil)
+
+						_, err = pr.GetTaskByID(taskID)
+						So(err, ShouldNotBeNil)
 					})
 				})
 			})

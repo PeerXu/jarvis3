@@ -1,0 +1,26 @@
+package main
+
+import (
+	"github.com/gopherjs/gopherjs/js"
+
+	e "github.com/PeerXu/jarvis3/example/executor/hello"
+)
+
+func main() {
+	document := js.Global.Get("document")
+
+	resBuf := document.Call("getElementById", "__JVS_RES_BUF_01234567")
+	errBuf := document.Call("getElementById", "__JVS_ERR_BUF_01234567")
+
+	ctx := e.Constructor.ContextMaker()
+	req := e.Constructor.RequestMaker(ctx)
+	exec := e.Constructor.ExecutorMaker()
+
+	res, err := exec.Execute(req)
+
+	if err != nil {
+		errBuf.Set("innerHTML", err.Error())
+	}
+
+	resBuf.Set("innerHTML", res.Data().Get())
+}

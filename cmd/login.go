@@ -1,63 +1,61 @@
-// Copyright © 2016 Peer Xu <pppeerxu@gmail.com>
+// Copyright © 2017 Peer Xu <pppeerxu@gmail.com>
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// This file is part of test.
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// test is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Lesser General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// test is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with test. If not, see <http://www.gnu.org/licenses/>.
 
 package cmd
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/go-kit/kit/log"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
-
-var Username string
-var Password string
 
 // loginCmd represents the login command
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Log in to jarvis3 server",
 	Run: func(cmd *cobra.Command, args []string) {
-		var logger log.Logger
-		{
-			logger = log.NewLogfmtLogger(os.Stderr)
-			logger = log.NewContext(logger).With("ts", log.DefaultTimestampUTC)
-		}
-
-		signCli, err := SimpleNewSigningClient(logger)
+		logger := NewClientLogger()
+		signCli, err := NewSigningClientForClientWithoutEnvironment(logger)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
 		ctx := context.Background()
-		token, err := signCli.Login(ctx, Username, Password)
+		u, err := signCli.Login(ctx, Username, Password)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
+		token := u.AccessTokens[0]
 
 		ok, err := cmd.Flags().GetBool("env")
 		if err == nil && ok {
 			fmt.Printf(`
-export JVS_USERNAME=%v
-export JVS_ACCESS_TOKEN=%v
-`, Username, token.Token)
+export JVS_USER_ID="%v"
+export JVS_USERNAME="%v"
+export JVS_ACCESS_TOKEN="%v"
+`, u.ID.String(), Username, token.Token)
 		} else {
-			fmt.Printf("access tokenk: %v\n", token.Token)
+			fmt.Printf(`login successed!
+user id: %v
+username: %v
+access token: %v`, u.ID.String(), Username, token.Token)
 		}
 	},
 }

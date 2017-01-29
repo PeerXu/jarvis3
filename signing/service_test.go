@@ -10,65 +10,69 @@ import (
 
 	jcontext "github.com/PeerXu/jarvis3/context"
 	"github.com/PeerXu/jarvis3/repository"
-	"github.com/PeerXu/jarvis3/user"
 )
 
 func TestSigningService(t *testing.T) {
-	users := repository.NewUserRepository()
-	logger := log.NewLogfmtLogger(os.Stderr)
-	s := NewService(logger, users)
-	ctx := context.Background()
 
-	c.Convey("login error password", t, func() {
-		_, err := s.Login(ctx, "admin", "??????")
-		c.So(err, c.ShouldNotBeNil)
-	})
+	c.Convey("singing service", t, func() {
+		users := repository.NewUserRepository()
+		logger := log.NewLogfmtLogger(os.Stderr)
+		s := NewService(logger, users)
+		ctx := context.Background()
 
-	c.Convey("login an existed user", t, func() {
-		at, err := s.Login(ctx, "admin", "admin")
-		c.So(err, c.ShouldBeNil)
+		c.Convey("login error password", func() {
+			_, err := s.Login(ctx, "admin", "??????")
+			c.So(err, c.ShouldNotBeNil)
+		})
 
-		jctx := jcontext.NewContext(&user.User{Username: "admin"}, at)
-		ctx = context.WithValue(ctx, "JarvisContext", jctx)
-
-		c.Convey("create a new user", func() {
-			_, err := s.CreateUser(ctx, "test", "test", "test@jarvis3.cc")
+		c.Convey("login an existed user", func() {
+			u, err := s.Login(ctx, "admin", "admin")
 			c.So(err, c.ShouldBeNil)
 
-			c.Convey("login with new user", func() {
-				ctx = context.Background()
-				at, err = s.Login(ctx, "test", "test")
+			at := u.AccessTokens[0]
+
+			jctx := jcontext.NewContext(u, at)
+			ctx = context.WithValue(ctx, "JarvisContext", jctx)
+
+			c.Convey("create a new user", func() {
+				u2, err := s.CreateUser(ctx, "test", "test", "test@jarvis3.cc")
+				c.So(err, c.ShouldBeNil)
+
+				c.Convey("login with new user", func() {
+					ctx = context.Background()
+					_, err = s.Login(ctx, "test", "test")
+					c.So(err, c.ShouldBeNil)
+				})
+
+				c.Convey("delete a new user", func() {
+					err = s.DeleteUserByID(ctx, u2.ID)
+					c.So(err, c.ShouldBeNil)
+
+					_, err = s.GetUserByID(ctx, u2.ID)
+					c.So(err, c.ShouldNotBeNil)
+				})
+			})
+
+			c.Convey("create an agent token", func() {
+				_, err := s.CreateAgentToken(ctx, "token1")
+				c.So(err, c.ShouldBeNil)
+
+				c.Convey("delete an agent token", func() {
+					err = s.DeleteAgentToken(ctx, "token1")
+					c.So(err, c.ShouldBeNil)
+				})
+			})
+
+			c.Convey("validate access token", func() {
+				ctx = context.WithValue(ctx, "Authorization", at.Token)
+				_, err = s.ValidateToken(ctx)
 				c.So(err, c.ShouldBeNil)
 			})
 
-			c.Convey("delete a new user", func() {
-				err = s.DeleteUser(ctx, "test")
-				c.So(err, c.ShouldBeNil)
-
-				_, err = s.GetUser(ctx, "test")
-				c.So(err, c.ShouldNotBeNil)
-			})
-		})
-
-		c.Convey("create an agent token", func() {
-			_, err := s.CreateAgentToken(ctx, "token1")
-			c.So(err, c.ShouldBeNil)
-
-			c.Convey("delete an agent token", func() {
-				err = s.DeleteAgentToken(ctx, "token1")
+			c.Convey("logout with access-token", func() {
+				err = s.Logout(ctx, u.ID)
 				c.So(err, c.ShouldBeNil)
 			})
-		})
-
-		c.Convey("logout with access-token", func() {
-			err = s.Logout(ctx, "admin")
-			c.So(err, c.ShouldBeNil)
-		})
-
-		c.Convey("validate access token", func() {
-			ctx = context.WithValue(ctx, "Authorization", at.Token)
-			_, err = s.ValidateAccessToken(ctx)
-			c.So(err, c.ShouldBeNil)
 		})
 	})
 }

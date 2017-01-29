@@ -22,3 +22,8 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+# Custom Files
+dist
+jarvis3
+jarvis3.yaml

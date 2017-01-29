@@ -8,17 +8,18 @@ import (
 
 type userRepository struct {
 	mtx          sync.RWMutex
-	users        map[string]*user.User
-	accessTokens map[string]*user.User
-	agentTokens  map[string]*user.User
+	users        map[user.UserID]*user.User
+	accessTokens map[string]user.UserID
+	agentTokens  map[string]user.UserID
 }
 
 func NewUserRepository() *userRepository {
+	admin := user.NewUser("admin", "admin", "pppeerxu@gmail.com")
 	return &userRepository{
 		mtx:          sync.RWMutex{},
-		users:        map[string]*user.User{"admin": user.NewUser("admin", "admin", "jarvis3@gmail.com")},
-		accessTokens: map[string]*user.User{},
-		agentTokens:  map[string]*user.User{},
+		users:        map[user.UserID]*user.User{admin.ID: admin},
+		accessTokens: map[string]user.UserID{},
+		agentTokens:  map[string]user.UserID{},
 	}
 }
 
@@ -26,31 +27,30 @@ func (r *userRepository) CreateUser(u *user.User) (*user.User, error) {
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
-	r.users[u.Username] = u
+	r.users[u.ID] = u
 	return u, nil
 }
 
-func (r *userRepository) DeleteUser(username string) error {
+func (r *userRepository) DeleteUserByID(id user.UserID) error {
 	r.mtx.Lock()
 	defer r.mtx.Unlock()
 
-	delete(r.users, username)
+	delete(r.users, id)
 	return nil
 }
 
-func (r *userRepository) GetUser(username string) (*user.User, error) {
+func (r *userRepository) GetUserByID(id user.UserID) (*user.User, error) {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	if u, ok := r.users[username]; ok {
+	if u, ok := r.users[id]; ok {
 		return u, nil
 	}
-
 	return nil, user.ErrUserNotFound
 }
 
-func (r *userRepository) CreateAccessToken(u *user.User, t *user.AccessToken) error {
-	u, err := r.GetUser(u.Username)
+func (r *userRepository) CreateAccessToken(id user.UserID, t *user.AccessToken) error {
+	u, err := r.GetUserByID(id)
 	if err != nil {
 		return err
 	}
@@ -65,13 +65,13 @@ func (r *userRepository) CreateAccessToken(u *user.User, t *user.AccessToken) er
 	}
 
 	u.AccessTokens = append(u.AccessTokens, t)
-	r.accessTokens[t.Token] = u
+	r.accessTokens[t.Token] = id
 
 	return nil
 }
 
-func (r *userRepository) DeleteAccessTokens(u *user.User, ts []*user.AccessToken) error {
-	u, err := r.GetUser(u.Username)
+func (r *userRepository) DeleteAccessTokens(id user.UserID, ts []*user.AccessToken) error {
+	u, err := r.GetUserByID(id)
 	if err != nil {
 		return err
 	}
@@ -82,16 +82,16 @@ func (r *userRepository) DeleteAccessTokens(u *user.User, ts []*user.AccessToken
 	var nts []*user.AccessToken
 
 	for _, et := range u.AccessTokens {
-		flg := false
+		found := false
 		for j, dt := range ts {
 			if dt.Token == et.Token {
-				flg = true
+				found = true
 				delete(r.accessTokens, dt.Token)
 				ts = append(ts[:j], ts[j+1:]...)
 				break
 			}
 		}
-		if !flg {
+		if !found {
 			nts = append(nts, et)
 		}
 	}
@@ -100,20 +100,33 @@ func (r *userRepository) DeleteAccessTokens(u *user.User, ts []*user.AccessToken
 	return nil
 }
 
+func (r *userRepository) LookupUserByUsername(username string) (*user.User, error) {
+	for _, u := range r.users {
+		if u.Username == username {
+			return u, nil
+		}
+	}
+	return nil, user.ErrUserNotFound
+}
+
 func (r *userRepository) LookupUserByAccessToken(t *user.AccessToken) (*user.User, error) {
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	u, ok := r.accessTokens[t.Token]
+	userID, ok := r.accessTokens[t.Token]
 	if !ok {
 		return nil, user.ErrAccessTokenNotFound
+	}
+	u, err := r.GetUserByID(userID)
+	if err != nil {
+		return nil, err
 	}
 	return u, nil
 
 }
 
-func (r *userRepository) CreateAgentToken(u *user.User, t *user.AgentToken) error {
-	u, err := r.GetUser(u.Username)
+func (r *userRepository) CreateAgentToken(id user.UserID, t *user.AgentToken) error {
+	u, err := r.GetUserByID(id)
 	if err != nil {
 		return err
 	}
@@ -128,13 +141,13 @@ func (r *userRepository) CreateAgentToken(u *user.User, t *user.AgentToken) erro
 	}
 
 	u.AgentTokens = append(u.AgentTokens, t)
-	r.agentTokens[t.Token] = u
+	r.agentTokens[t.Token] = id
 
 	return nil
 }
 
-func (r *userRepository) DeleteAgentTokens(u *user.User, ts []*user.AgentToken) error {
-	u, err := r.GetUser(u.Username)
+func (r *userRepository) DeleteAgentTokens(id user.UserID, ts []*user.AgentToken) error {
+	u, err := r.GetUserByID(id)
 	if err != nil {
 		return err
 	}
@@ -145,16 +158,16 @@ func (r *userRepository) DeleteAgentTokens(u *user.User, ts []*user.AgentToken) 
 	var nts []*user.AgentToken
 
 	for _, et := range u.AgentTokens {
-		flg := false
+		found := false
 		for j, dt := range ts {
 			if dt.Token == et.Token {
-				flg = true
+				found = true
 				delete(r.agentTokens, dt.Token)
 				ts = append(ts[:j], ts[j+1:]...)
 				break
 			}
 		}
-		if !flg {
+		if !found {
 			nts = append(nts, et)
 		}
 	}
@@ -167,16 +180,20 @@ func (r *userRepository) LookupUserByAgentToken(t *user.AgentToken) (*user.User,
 	r.mtx.RLock()
 	defer r.mtx.RUnlock()
 
-	u, ok := r.agentTokens[t.Token]
+	userID, ok := r.agentTokens[t.Token]
 	if !ok {
 		return nil, user.ErrAgentTokenNotFound
+	}
+	u, err := r.GetUserByID(userID)
+	if err != nil {
+		return nil, err
 	}
 
 	return u, nil
 }
 
-func (r *userRepository) LookupAgentTokenByName(u *user.User, n string) (*user.AgentToken, error) {
-	u, err := r.GetUser(u.Username)
+func (r *userRepository) LookupAgentTokenByName(id user.UserID, n string) (*user.AgentToken, error) {
+	u, err := r.GetUserByID(id)
 	if err != nil {
 		return nil, err
 	}

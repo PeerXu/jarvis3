@@ -6,6 +6,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"golang.org/x/net/context"
 
+	. "github.com/PeerXu/jarvis3/signing/service"
 	"github.com/PeerXu/jarvis3/user"
 )
 
@@ -32,20 +33,20 @@ func (s *loggingService) CreateUser(ctx context.Context, username string, passwo
 	return s.Service.CreateUser(ctx, username, password, email)
 }
 
-func (s *loggingService) GetUser(ctx context.Context, username string) (u *user.User, err error) {
+func (s *loggingService) GetUserByID(ctx context.Context, id user.UserID) (u *user.User, err error) {
 	defer func(begin time.Time) {
 		s.logger.Log(
-			"method", "GetUser",
-			"username", username,
+			"method", "GetUserByID",
+			"user_id", id.String(),
 			"took", time.Since(begin),
 			"err", err,
 		)
 	}(time.Now())
 
-	return s.Service.GetUser(ctx, username)
+	return s.Service.GetUserByID(ctx, id)
 }
 
-func (s *loggingService) Login(ctx context.Context, username string, password string) (t *user.AccessToken, err error) {
+func (s *loggingService) Login(ctx context.Context, username string, password string) (u *user.User, err error) {
 	defer func(begin time.Time) {
 		s.logger.Log(
 			"method", "Login",
@@ -58,17 +59,17 @@ func (s *loggingService) Login(ctx context.Context, username string, password st
 	return s.Service.Login(ctx, username, password)
 }
 
-func (s *loggingService) Logout(ctx context.Context, username string) (err error) {
+func (s *loggingService) Logout(ctx context.Context, id user.UserID) (err error) {
 	defer func(begin time.Time) {
 		s.logger.Log(
 			"method", "Logout",
-			"username", username,
+			"user_id", id.String(),
 			"took", time.Since(begin),
 			"err", err,
 		)
 	}(time.Now())
 
-	return s.Service.Logout(ctx, username)
+	return s.Service.Logout(ctx, id)
 }
 
 func (s *loggingService) CreateAgentToken(ctx context.Context, name string) (t *user.AgentToken, err error) {
@@ -95,13 +96,13 @@ func (s *loggingService) DeleteAgentToken(ctx context.Context, name string) (err
 	return s.Service.DeleteAgentToken(ctx, name)
 }
 
-func (s *loggingService) ValidateAccessToken(ctx context.Context) (u *user.User, err error) {
+func (s *loggingService) ValidateToken(ctx context.Context) (u *user.User, err error) {
 	defer func(begin time.Time) {
 		s.logger.Log(
-			"method", "ValidateAccessToken",
+			"method", "ValidateToken",
 			"took", time.Since(begin),
 			"err", err,
 		)
 	}(time.Now())
-	return s.Service.ValidateAccessToken(ctx)
+	return s.Service.ValidateToken(ctx)
 }

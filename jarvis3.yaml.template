@@ -1,0 +1,7 @@
+development:
+  server:
+    home: <jarvis3 home path>
+    host: 0.0.0.0:27182
+  service:
+    signing:
+      host: 127.0.0.1:27182

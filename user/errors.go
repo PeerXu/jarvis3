@@ -8,4 +8,5 @@ var (
 	ErrInvalidUsernameOrPassword = errors.New("invalid username or password")
 	ErrAccessTokenNotFound       = errors.New("access token not found")
 	ErrAgentTokenNotFound        = errors.New("agent token not found")
+	ErrBadTokenFormat            = errors.New("bad format token")
 )

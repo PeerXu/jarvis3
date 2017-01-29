@@ -5,13 +5,13 @@ import (
 	"golang.org/x/net/context"
 
 	jcontext "github.com/PeerXu/jarvis3/context"
-	"github.com/PeerXu/jarvis3/signing"
+	signing_service "github.com/PeerXu/jarvis3/signing/service"
 )
 
-func RemoteValidateAccessTokenMiddleware(cli signing.Service) endpoint.Middleware {
+func RemoteValidateTokenMiddleware(cli signing_service.Service) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request interface{}) (interface{}, error) {
-			u, err := cli.ValidateAccessToken(ctx)
+			u, err := cli.ValidateToken(ctx)
 			if err != nil {
 				return err, nil
 			}

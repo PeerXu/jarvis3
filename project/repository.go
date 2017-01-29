@@ -1,16 +1,20 @@
 package project
 
+import "github.com/PeerXu/jarvis3/user"
+
 type Repository interface {
 	CreateExecutor(*Executor) (*Executor, error)
-	DeleteExecutor(owner string, name string) error
-	GetExecutor(owner string, name string) (*Executor, error)
-	ListExecutors(owner string) ([]*Executor, error)
+	DeleteExecutorByID(id ExecutorID) error
+	GetExecutorByID(id ExecutorID) (*Executor, error)
+	ListExecutors(id user.UserID) ([]*Executor, error)
 	CreateProject(*Project) (*Project, error)
-	DeleteProject(owner string, name string) error
-	GetProject(owner string, name string) (*Project, error)
-	ListProjects(owner string) ([]*Project, error)
-	CreateJob(owner string, project string, job *Job) (*Job, error)
-	GetJob(owner string, project string, name string) (*Job, error)
-	ListJobs(owner string, project string) ([]*Job, error)
-	UpdateJob(owner string, name string, proj string, job *Job) (*Job, error)
+	DeleteProjectByID(id ProjectID) error
+	GetProjectByID(id ProjectID) (*Project, error)
+	ListProjects(id user.UserID) ([]*Project, error)
+	CreateTask(task *Task) (*Task, error)
+	DeleteTaskByID(id TaskID) error
+	GetTaskByID(id TaskID) (*Task, error)
+	ListTasksByProjectID(projID ProjectID) ([]*Task, error)
+	UpdateTaskByID(id TaskID, task *Task) (*Task, error)
+	PopReadyTask() (*Task, error)
 }

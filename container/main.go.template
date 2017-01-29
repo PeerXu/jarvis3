@@ -1,0 +1,39 @@
+package main
+
+import (
+	"github.com/gopherjs/gopherjs/js"
+
+	e "{{.Executor.Path}}"
+)
+
+func main() {
+	document := js.Global.Get("document")
+
+	resBuf := document.Call("getElementById", "__JVS_RES_BUF_{{.Container.Code}}")
+	errBuf := document.Call("getElementById", "__JVS_ERR_BUF_{{.Container.Code}}")
+	doneBuf := document.Call("getElementById", "__JVS_DONE_BUF_{{.Container.Code}}")
+
+	ctx := e.Constructor.ContextMaker()
+	{{range $key, $val := .Container.Metadata}}
+	ctx.Metadata().Set("{{$key}}", "{{$val}}")
+	{{end}}
+	ctx.Data().Set("{{.Container.Data}}")
+
+	req := e.Constructor.RequestMaker(ctx)
+	req.Data().Set("{{.Request.Data}}")
+
+	exec := e.Constructor.ExecutorMaker()
+	{{range $key, $val := .Executor.Metadata}}
+	ctx.Metadata().Set("{{$key}}", "{{$val}}")
+	{{end}}
+	exec.Data().Set("{{.Executor.Data}}")
+
+	res, err := exec.Execute(req)
+
+	if err != nil {
+		errBuf.Set("innerHTML", err.Error())
+	}
+
+	resBuf.Set("innerHTML", res.Data().Get())
+	doneBuf.Set("innerHTML", "1")
+}

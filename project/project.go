@@ -1,50 +1,70 @@
 package project
 
-type Project struct {
-	Name  string
-	Owner string
-
-	Jobs []*Job
-}
-
-func NewProject(name, owner string) *Project {
-	return &Project{
-		Name:  name,
-		Owner: owner,
-		Jobs:  []*Job{},
-	}
-}
-
-type Job struct {
-	Name     string
-	Status   JobStatus
-	Executor *Executor
-	Data     []byte
-}
-
-const RANDOM_NAME = ""
-
-func NewJob(name string, executor *Executor, data []byte) *Job {
-	return &Job{
-		Name:     name,
-		Status:   JobStatus_Prepare,
-		Executor: executor,
-		Data:     data,
-	}
-}
-
-type JobStatus int
-
-const (
-	JobStatus_Unknown JobStatus = 0
-	JobStatus_Error   JobStatus = 1
-	JobStatus_Prepare JobStatus = 2
-	JobStatus_Ready   JobStatus = 3
-	JobStatus_Running JobStatus = 4
-	JobStatus_Stop    JobStatus = 5
+import (
+	"github.com/PeerXu/jarvis3/user"
+	"github.com/PeerXu/jarvis3/utils"
 )
 
-var JobStatus_name = map[int]string{
+type ProjectID string
+
+func (id ProjectID) String() string {
+	return string(id)
+}
+
+type Project struct {
+	ID      ProjectID
+	OwnerID user.UserID
+	Name    string
+	Tasks   []*Task
+}
+
+func NewProject(ownerID user.UserID, name string) *Project {
+	return &Project{
+		ID:      ProjectID(utils.NewRandomUUIDString()),
+		OwnerID: ownerID,
+		Name:    name,
+		Tasks:   []*Task{},
+	}
+}
+
+type TaskID string
+
+func (id TaskID) String() string {
+	return string(id)
+}
+
+type Task struct {
+	ID         TaskID
+	ProjectID  ProjectID
+	ExecutorID ExecutorID
+	Name       string
+	Status     TaskStatus
+	Data       []byte
+}
+
+func NewTask(projID ProjectID, execID ExecutorID, name string, data []byte) *Task {
+	return &Task{
+		ID:         TaskID(utils.NewRandomUUIDString()),
+		ProjectID:  projID,
+		ExecutorID: execID,
+		Name:       name,
+		Status:     TaskStatus_Prepare,
+		Data:       data,
+	}
+}
+
+type TaskStatus int
+
+const (
+	TaskStatus_Unknown TaskStatus = 0
+	TaskStatus_Error   TaskStatus = 1
+	TaskStatus_Prepare TaskStatus = 2
+	TaskStatus_Ready   TaskStatus = 3
+	TaskStatus_Running TaskStatus = 4
+	TaskStatus_Stop    TaskStatus = 5
+)
+
+var TaskStatus_name = map[int]string{
 	0: "unknown",
 	1: "error",
 	2: "prepare",
@@ -53,7 +73,7 @@ var JobStatus_name = map[int]string{
 	5: "stop",
 }
 
-var JobStatus_value = map[string]int{
+var TaskStatus_value = map[string]int{
 	"unknown": 0,
 	"error":   1,
 	"prepare": 2,
@@ -62,26 +82,34 @@ var JobStatus_value = map[string]int{
 	"stop":    5,
 }
 
-func (x JobStatus) String() string {
-	return JobStatus_name[int(x)]
+func (x TaskStatus) String() string {
+	return TaskStatus_name[int(x)]
 }
 
-func LookupJobStatus(s string) JobStatus {
-	return JobStatus(JobStatus_value[s])
+func LookupTaskStatus(s string) TaskStatus {
+	return TaskStatus(TaskStatus_value[s])
+}
+
+type ExecutorID string
+
+func (id ExecutorID) String() string {
+	return string(id)
 }
 
 type Executor struct {
-	Name  string
-	Pack  string
-	Owner string
-	Data  []byte
+	ID      ExecutorID
+	OwnerID user.UserID
+	Name    string
+	Pack    string
+	Data    []byte
 }
 
-func NewExecutor(name string, pack string, owner string, data []byte) *Executor {
+func NewExecutor(ownerID user.UserID, name string, pack string, data []byte) *Executor {
 	return &Executor{
-		Name:  name,
-		Pack:  pack,
-		Owner: owner,
-		Data:  data,
+		ID:      ExecutorID(utils.NewRandomUUIDString()),
+		OwnerID: ownerID,
+		Name:    name,
+		Pack:    pack,
+		Data:    data,
 	}
 }
