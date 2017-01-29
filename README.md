@@ -1,6 +1,6 @@
 # JARVIS3
 
-Just A Remote Volunteer computIing System
+Just A Remote Volunteer computIng System
 
 =========================================
 
